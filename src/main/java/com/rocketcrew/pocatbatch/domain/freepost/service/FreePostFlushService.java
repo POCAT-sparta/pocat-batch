@@ -2,10 +2,12 @@ package com.rocketcrew.pocatbatch.domain.freepost.service;
 
 import com.rocketcrew.pocatbatch.domain.freepost.repository.FreePostRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class FreePostFlushService {
@@ -19,7 +21,7 @@ public class FreePostFlushService {
         }
         int updated = freePostRepository.increaseViewCount(postId, count);
         if (updated == 0) {
-            throw new IllegalStateException("No row updated for postId=" + postId + " (post may have been deleted)");
+            log.warn("increaseViewCount skipped: postId={} not found (deleted), no retry", postId);
         }
     }
 
@@ -27,7 +29,7 @@ public class FreePostFlushService {
     public void updateCommentCount(Long postId, int delta) {
         int updated = freePostRepository.updateCommentCount(postId, delta);
         if (updated == 0) {
-            throw new IllegalStateException("No row updated for postId=" + postId + " (post may have been deleted)");
+            log.warn("updateCommentCount skipped: postId={} not found (deleted), no retry", postId);
         }
     }
 }
