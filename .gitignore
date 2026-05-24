@@ -1,0 +1,22 @@
+# Environment
+.env
+*.env.local
+
+# Build
+build/
+.gradle/
+out/
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
