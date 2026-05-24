@@ -17,11 +17,17 @@ public class FreePostFlushService {
         if (count < 0) {
             throw new IllegalArgumentException("View count increment must not be negative: " + count);
         }
-        freePostRepository.increaseViewCount(postId, count);
+        int updated = freePostRepository.increaseViewCount(postId, count);
+        if (updated == 0) {
+            throw new IllegalStateException("No row updated for postId=" + postId + " (post may have been deleted)");
+        }
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void updateCommentCount(Long postId, int delta) {
-        freePostRepository.updateCommentCount(postId, delta);
+        int updated = freePostRepository.updateCommentCount(postId, delta);
+        if (updated == 0) {
+            throw new IllegalStateException("No row updated for postId=" + postId + " (post may have been deleted)");
+        }
     }
 }
