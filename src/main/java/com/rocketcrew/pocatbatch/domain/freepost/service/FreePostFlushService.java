@@ -14,6 +14,9 @@ public class FreePostFlushService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void increaseViewCount(Long postId, int count) {
+        if (count < 0) {
+            throw new IllegalArgumentException("View count increment must not be negative: " + count);
+        }
         freePostRepository.increaseViewCount(postId, count);
     }
 

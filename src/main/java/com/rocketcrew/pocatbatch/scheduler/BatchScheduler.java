@@ -3,7 +3,9 @@ package com.rocketcrew.pocatbatch.scheduler;
 import com.rocketcrew.pocatbatch.job.ranking.FreePostRankingJobConfig;
 import com.rocketcrew.pocatbatch.job.viewcount.ViewCountFlushJobConfig;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.Job;
+import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.JobParameters;
 import org.springframework.batch.core.JobParametersBuilder;
 import org.springframework.batch.core.launch.JobLauncher;
@@ -44,8 +46,15 @@ public class BatchScheduler {
             JobParameters params = new JobParametersBuilder()
                     .addLong("ts", System.currentTimeMillis())
                     .toJobParameters();
-            jobLauncher.run(job, params);
-            log.info("{} 실행 완료", label);
+            JobExecution jobExecution = jobLauncher.run(job, params);
+            if (jobExecution.getStatus() == BatchStatus.COMPLETED) {
+                log.info("{} 실행 완료", label);
+            } else {
+                log.error("{} 비정상 종료: status={}, failures={}",
+                        label,
+                        jobExecution.getStatus(),
+                        jobExecution.getAllFailureExceptions());
+            }
         } catch (Exception e) {
             log.error("{} 실행 실패", label, e);
         }

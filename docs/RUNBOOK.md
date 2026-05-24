@@ -52,7 +52,7 @@ timezone 명시가 필요한 경우:
 
 Spring Batch가 MySQL에 메타테이블을 자동 생성한다. 아래와 같은 로그가 출력되면 정상이다.
 
-```
+```text
 Executing SQL script from class path resource [org/springframework/batch/core/schema-mysql.sql]
 HikariPool-1 - Starting...
 HikariPool-1 - Start completed.
@@ -105,7 +105,7 @@ spring:
 
 JVM 레벨에서 timezone을 명시하지 않으면 서버 OS 설정을 따른다. 운영 서버에서 KST 기준 스케줄 로그를 확인하려면 JVM 옵션에 다음을 추가한다:
 
-```
+```text
 -Duser.timezone=Asia/Seoul
 ```
 

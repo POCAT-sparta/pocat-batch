@@ -4,7 +4,7 @@
 
 ## 패키지 트리
 
-```
+```text
 com.rocketcrew.pocatbatch/
 ├── PocatBatchApplication
 ├── config/
@@ -58,7 +58,7 @@ flowchart TD
 
 ### 텍스트 다이어그램 (Mermaid 미지원 환경)
 
-```
+```text
 BatchScheduler(@Scheduled fixedDelay=60s)
   ├─ runFreePostRankingJob()
   │    └─ JobLauncher.run(freePostRankingJob)
