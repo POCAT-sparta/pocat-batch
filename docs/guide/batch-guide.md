@@ -35,7 +35,7 @@
 메인 앱(`pocat`)은 `@Scheduled` 어노테이션으로 스케줄링 작업을 실행합니다.
 단일 서버에서는 문제가 없지만, **앱 서버를 2대 이상 띄우는 순간** 모든 인스턴스가 동시에 스케줄러를 실행합니다.
 
-```
+```text
 [문제 상황]
 App Server 1 ──▶ @Scheduled 실행 ──▶ Redis RENAME ──▶ MySQL 쓰기
 App Server 2 ──▶ @Scheduled 실행 ──▶ Redis RENAME ──▶ MySQL 중복 쓰기 ← 데이터 정합성 파괴
@@ -43,7 +43,7 @@ App Server 2 ──▶ @Scheduled 실행 ──▶ Redis RENAME ──▶ MySQL 
 
 `pocat-batch`는 **스케줄링을 담당하는 별도 서버 1대**를 두어 이 문제를 해결합니다.
 
-```
+```text
 App Server 1 ──▶ 일반 요청 처리만
 App Server 2 ──▶ 일반 요청 처리만
 Batch Server ──▶ 스케줄링 작업 독점 실행
@@ -55,7 +55,7 @@ Batch Server ──▶ 스케줄링 작업 독점 실행
 
 배치 서버가 시작되면 다음 순서로 동작합니다.
 
-```
+```text
 [서버 시작]
   └─ PocatBatchApplication.main()
        ├─ .env 파일 로드 (OS 환경변수 우선)
@@ -113,7 +113,7 @@ MySQL에 자동 생성되는 테이블로 모든 Job 실행 기록을 저장합�
 
 ### Job → Step → Tasklet 계층 구조
 
-```
+```text
 Job (전체 배치 작업 단위)
  └─ Step (Job을 구성하는 단계)
       └─ Tasklet (Step 안에서 실행되는 실제 로직)
@@ -154,7 +154,7 @@ JobConfig는 Job과 Step 빈을 Spring 컨텍스트에 등록하는 설정 클�
 
 ## 4. 프로젝트 구조
 
-```
+```text
 com.rocketcrew.pocatbatch/
 ├── PocatBatchApplication          ← 진입점. dotenv 로드 + Spring 시작
 ├── config/
@@ -198,7 +198,7 @@ com.rocketcrew.pocatbatch/
 
 메인 앱의 `@Scheduled` 스케줄러 클래스를 찾아 확인합니다.
 
-```
+```text
 pocat/
 └── src/main/java/...
     └── scheduler/
@@ -217,7 +217,7 @@ pocat/
 
 아래 구조로 빈 패키지를 만듭니다. (IDE에서 패키지 생성 또는 디렉터리 직접 생성)
 
-```
+```text
 src/main/java/com/rocketcrew/pocatbatch/
 ├── domain/
 │   └── auction/                  ← 신규
@@ -826,13 +826,13 @@ BATCH_SERVER_PORT=8081
 
 서버 시작 로그에서 Job 등록 확인:
 
-```
+```text
 Started PocatBatchApplication in 3.2 seconds
 ```
 
 60초(또는 설정한 주기) 후 Job 실행 로그 확인:
 
-```
+```text
 INFO  BatchScheduler - auctionSettlementJob 실행 완료
 ```
 
@@ -953,7 +953,7 @@ if (Boolean.TRUE.equals(redisTemplate.hasKey(RANKING_NEW_KEY))) {
 DB_PASSWORD=mypassword   # 이 부분이 값으로 포함됨!
 ```
 
-**증상:** DB 연결 실패 — 비밀번호에 `   # 이 부분이 값으로 포함됨!`이 붙음
+**증상:** DB 연결 실패 — 비밀번호에 `# 이 부분이 값으로 포함됨!` (앞 공백 포함)이 붙음
 **해결:** 주석은 반드시 **별도 줄**에 작성
 
 ```env
@@ -968,7 +968,7 @@ DB_PASSWORD=mypassword
 자유게시판 구현(`freepost`)이 이 프로젝트의 샘플 코드입니다.
 새 도메인 구현 전에 아래 파일들을 순서대로 읽으면 패턴을 파악할 수 있습니다.
 
-```
+```text
 읽는 순서:
 1. domain/freepost/entity/BaseEntity.java          → 공통 엔티티 필드
 2. domain/freepost/entity/FreePost.java             → 엔티티 복제 방식, @SQLRestriction
