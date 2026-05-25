@@ -84,6 +84,7 @@ timezone 설정이 필요한 경우:
 
 ## 관련 문서
 
+- [`docs/guide/batch-guide.md`](docs/guide/batch-guide.md) — **팀원 대상 개발 가이드 (새 Job 추가 방법 · 동작 원리)**
 - [`docs/ADR-001-spring-batch-separation.md`](docs/ADR-001-spring-batch-separation.md) — 분리 결정 배경
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — 패키지 구조·Job 흐름·Redis 키 표
 - [`docs/RUNBOOK.md`](docs/RUNBOOK.md) — 실행·운영 가이드
