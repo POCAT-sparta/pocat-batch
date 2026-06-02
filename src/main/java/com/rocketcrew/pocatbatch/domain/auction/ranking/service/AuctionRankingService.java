@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -46,20 +47,22 @@ public class AuctionRankingService {
             Map<Long, Long> likeCounts = toLongMap(likeRepository.countByAuctionIdIn(auctionIds));
             Map<Long, Long> bidCounts = toLongMap(auctionBidRepository.countByAuctionIdIn(auctionIds));
 
-            String newKey = RANKING_KEY + ":new";
-            redisTemplate.delete(newKey);
+            String stagingKey = RANKING_KEY + ":staging:" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+            try {
+                for (Auction auction : activeAuctions) {
+                    long likeCount = likeCounts.getOrDefault(auction.getId(), 0L);
+                    long bidCount = bidCounts.getOrDefault(auction.getId(), 0L);
+                    double score = likeCount * properties.getLikeWeight() + bidCount * properties.getBidWeight();
+                    redisTemplate.opsForZSet().add(stagingKey, auction.getId().toString(), score);
+                }
 
-            for (Auction auction : activeAuctions) {
-                long likeCount = likeCounts.getOrDefault(auction.getId(), 0L);
-                long bidCount = bidCounts.getOrDefault(auction.getId(), 0L);
-                double score = likeCount * properties.getLikeWeight() + bidCount * properties.getBidWeight();
-                redisTemplate.opsForZSet().add(newKey, auction.getId().toString(), score);
+                trimToCacheSize(stagingKey);
+                redisTemplate.rename(stagingKey, RANKING_KEY);
+                redisTemplate.expire(RANKING_KEY, properties.getTtlSeconds(), TimeUnit.SECONDS);
+                log.debug("경매 랭킹 갱신 완료: {} 개 경매", activeAuctions.size());
+            } finally {
+                redisTemplate.delete(stagingKey);
             }
-
-            trimToCacheSize(newKey);
-            redisTemplate.rename(newKey, RANKING_KEY);
-            redisTemplate.expire(RANKING_KEY, properties.getTtlSeconds(), TimeUnit.SECONDS);
-            log.debug("경매 랭킹 갱신 완료: {} 개 경매", activeAuctions.size());
 
         } catch (Exception e) {
             log.warn("경매 랭킹 갱신 실패", e);

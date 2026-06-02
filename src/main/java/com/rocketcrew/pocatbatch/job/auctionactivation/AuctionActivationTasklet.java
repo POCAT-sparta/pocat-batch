@@ -40,7 +40,7 @@ public class AuctionActivationTasklet implements Tasklet {
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
                     log.warn("경매 활성화 락 획득 중 인터럽트: auctionId={}", auction.getId());
-                    continue;
+                    throw new RuntimeException("경매 활성화 인터럽트 발생", ie);
                 }
                 if (!locked) {
                     log.debug("경매 활성화 락 실패 (이미 처리 중): auctionId={}", auction.getId());
