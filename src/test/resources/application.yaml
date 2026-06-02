@@ -18,6 +18,12 @@ spring:
   kafka:
     bootstrap-servers: localhost:9092
 
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+      - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+
   batch:
     jdbc:
       initialize-schema: always
@@ -29,6 +35,8 @@ pocat:
     base-url: http://localhost:8080
     internal-token: test-token
   batch:
+    scheduler:
+      enabled: false
     card-sync:
       admin-user-id: 1
     ranking:

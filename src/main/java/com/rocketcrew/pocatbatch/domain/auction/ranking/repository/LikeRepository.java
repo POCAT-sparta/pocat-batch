@@ -10,11 +10,6 @@ import java.util.List;
 
 public interface LikeRepository extends JpaRepository<Like, Long> {
 
-    @Query("""
-            SELECT a.id AS auctionId, COUNT(l) AS cnt
-            FROM Like l
-            WHERE l.auctionId IN :auctionIds
-            GROUP BY l.auctionId
-            """)
+    @Query("SELECT l.auctionId AS auctionId, COUNT(l) AS cnt FROM Like l WHERE l.auctionId IN :auctionIds GROUP BY l.auctionId")
     List<AuctionCountProjection> countByAuctionIdIn(@Param("auctionIds") List<Long> auctionIds);
 }

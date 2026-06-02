@@ -10,11 +10,6 @@ import java.util.List;
 
 public interface AuctionBidRepository extends JpaRepository<AuctionBid, Long> {
 
-    @Query("""
-            SELECT a.id AS auctionId, COUNT(b) AS cnt
-            FROM AuctionBid b
-            WHERE b.auctionId IN :auctionIds
-            GROUP BY b.auctionId
-            """)
+    @Query("SELECT b.auctionId AS auctionId, COUNT(b) AS cnt FROM AuctionBid b WHERE b.auctionId IN :auctionIds GROUP BY b.auctionId")
     List<AuctionCountProjection> countByAuctionIdIn(@Param("auctionIds") List<Long> auctionIds);
 }

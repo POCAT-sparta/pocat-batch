@@ -5,8 +5,8 @@ import com.rocketcrew.pocatbatch.domain.outbox.entity.OutboxEvent;
 import com.rocketcrew.pocatbatch.domain.outbox.enums.OutboxStatus;
 import com.rocketcrew.pocatbatch.domain.outbox.repository.OutboxRepository;
 import com.rocketcrew.pocatbatch.domain.outbox.service.OutboxProcessor;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.batch.core.StepContribution;
 import org.springframework.batch.core.scope.context.ChunkContext;
@@ -20,13 +20,23 @@ import java.util.List;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class OutboxRelayTasklet implements Tasklet {
 
     private final OutboxRepository outboxRepository;
     private final OutboxProcessor outboxProcessor;
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final KafkaTemplate<String, String> paymentKafkaTemplate;
+
+    public OutboxRelayTasklet(
+            OutboxRepository outboxRepository,
+            OutboxProcessor outboxProcessor,
+            @Qualifier("kafkaTemplate") KafkaTemplate<String, String> kafkaTemplate,
+            @Qualifier("paymentKafkaTemplate") KafkaTemplate<String, String> paymentKafkaTemplate) {
+        this.outboxRepository = outboxRepository;
+        this.outboxProcessor = outboxProcessor;
+        this.kafkaTemplate = kafkaTemplate;
+        this.paymentKafkaTemplate = paymentKafkaTemplate;
+    }
 
     @Value("${outbox.relay.age-threshold-seconds:10}")
     private int ageThresholdSeconds;

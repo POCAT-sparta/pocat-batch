@@ -17,7 +17,6 @@ import org.springframework.batch.core.step.tasklet.Tasklet;
 import org.springframework.batch.repeat.RepeatStatus;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
@@ -29,6 +28,7 @@ public class CardSyncTasklet implements Tasklet {
     private final CardRepository cardRepository;
     private final OutboxEventWriter outboxEventWriter;
     private final ObjectMapper objectMapper;
+    private final RestTemplate restTemplate;
 
     @Value("${pocat.batch.card-sync.admin-user-id:1}")
     private Long adminUserId;
@@ -43,33 +43,36 @@ public class CardSyncTasklet implements Tasklet {
     public RepeatStatus execute(StepContribution contribution, ChunkContext chunkContext) {
         log.info("[CardSync] 배치 동기화 시작 (adminUserId={})", adminUserId);
 
-        RestTemplate restTemplate = createRestTemplate();
         int totalSynced = 0;
 
         try {
             String setsJson = restTemplate.getForObject(TCGDEX_SETS_URL, String.class);
+            if (setsJson == null) {
+                log.warn("[CardSync] TCGdex 응답 null — 동기화 스킵");
+                return RepeatStatus.FINISHED;
+            }
             JsonNode setsArray = objectMapper.readTree(setsJson);
 
             for (JsonNode setNode : setsArray) {
                 String setId = setNode.path("id").asText();
                 try {
-                    totalSynced += syncSet(restTemplate, setId, totalSynced);
+                    totalSynced += syncSet(setId, totalSynced);
                 } catch (Exception e) {
                     log.warn("[CardSync] 세트 동기화 실패 ({}): {}", setId, e.getMessage());
                 }
             }
 
         } catch (Exception e) {
-            log.error("[CardSync] 배치 동기화 실패", e);
-            throw new RuntimeException("카드 동기화 중 오류 발생", e);
+            log.error("[CardSync] 배치 동기화 실패 — 스킵 처리", e);
         }
 
         log.info("[CardSync] 배치 동기화 완료 — 신규 카드 총 {}개", totalSynced);
         return RepeatStatus.FINISHED;
     }
 
-    private int syncSet(RestTemplate restTemplate, String setId, int offset) throws Exception {
+    private int syncSet(String setId, int offset) throws Exception {
         String setJson = restTemplate.getForObject(TCGDEX_SET_URL + setId, String.class);
+        if (setJson == null) return 0;
         JsonNode setRoot = objectMapper.readTree(setJson);
 
         String setName = setRoot.path("name").asText("");
@@ -125,13 +128,6 @@ public class CardSyncTasklet implements Tasklet {
         }
 
         return synced;
-    }
-
-    private RestTemplate createRestTemplate() {
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(5_000);
-        factory.setReadTimeout(10_000);
-        return new RestTemplate(factory);
     }
 
     private CardCategory parseCategory(String category) {
