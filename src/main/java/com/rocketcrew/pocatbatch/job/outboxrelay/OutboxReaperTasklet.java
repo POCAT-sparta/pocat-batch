@@ -10,7 +10,6 @@ import org.springframework.batch.core.scope.context.ChunkContext;
 import org.springframework.batch.core.step.tasklet.Tasklet;
 import org.springframework.batch.repeat.RepeatStatus;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -21,25 +20,28 @@ import java.util.List;
 public class OutboxReaperTasklet implements Tasklet {
 
     private final OutboxRepository outboxRepository;
+    private static final int STUCK_MINUTES = 5;
 
     @Override
-    @Transactional
     public RepeatStatus execute(StepContribution contribution, ChunkContext chunkContext) {
         try {
-            // PROCESSING 상태가 5분 이상인 이벤트 조회
-            LocalDateTime stuckBefore = LocalDateTime.now().minusMinutes(5);
-            List<OutboxEvent> stuckEvents = outboxRepository.findAll().stream()
-                    .filter(e -> e.getStatus() == OutboxStatus.PROCESSING && e.getProcessedAt() != null && e.getProcessedAt().isBefore(stuckBefore))
-                    .toList();
+            LocalDateTime stuckBefore = LocalDateTime.now().minusMinutes(STUCK_MINUTES);
+
+            List<OutboxEvent> stuckEvents = outboxRepository.findByStatusAndProcessedAtBefore(
+                    OutboxStatus.PROCESSING, stuckBefore
+            );
 
             for (OutboxEvent event : stuckEvents) {
-                event.changeStatusToProcessing(); // 상태 재설정 안함 - 실제로는 PENDING으로 리셋해야 함
-                // processedAt을 null로 초기화해 PENDING 상태로 변경
-                outboxRepository.save(event);
-                log.warn("PROCESSING 이벤트 리셋: id={}, 5분 초과", event.getId());
+                try {
+                    event.resetToPending();
+                    outboxRepository.save(event);
+                    log.warn("Outbox stuck 이벤트 PENDING 복구: id={}", event.getId());
+                } catch (Exception e) {
+                    log.error("Outbox stuck 이벤트 복구 실패: id={}, error={}", event.getId(), e.getMessage());
+                }
             }
 
-            log.info("아웃박스 Reaper 완료: {} 개 stuck 이벤트 복구", stuckEvents.size());
+            log.info("OutboxReaper 완료: {} 개 복구", stuckEvents.size());
             return RepeatStatus.FINISHED;
         } catch (Exception e) {
             log.error("아웃박스 Reaper 실패", e);

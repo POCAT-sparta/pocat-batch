@@ -19,13 +19,22 @@ public interface OutboxRepository extends JpaRepository<OutboxEvent, Long> {
     /**
      * 조건부 UPDATE (선점용)
      */
-    @Modifying
-    @Query("UPDATE OutboxEvent o SET o.status = :to " +
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE OutboxEvent o SET o.status = :to, o.processedAt = CURRENT_TIMESTAMP " +
             "WHERE o.id = :id AND o.status = :from")
     int markProcessingIfPending(
             @Param("id") Long id,
             @Param("from") OutboxStatus from,
             @Param("to") OutboxStatus to
+    );
+
+    /**
+     * PROCESSING 상태에서 일정 시간 이상 멈춘 이벤트 조회 (Reaper용)
+     */
+    @Query("SELECT e FROM OutboxEvent e WHERE e.status = :status AND e.processedAt < :before")
+    List<OutboxEvent> findByStatusAndProcessedAtBefore(
+            @Param("status") OutboxStatus status,
+            @Param("before") LocalDateTime before
     );
 
     /**

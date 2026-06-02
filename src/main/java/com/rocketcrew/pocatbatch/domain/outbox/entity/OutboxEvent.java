@@ -78,4 +78,9 @@ public class OutboxEvent {
     public void changeStatusToProcessing() {
         this.status = OutboxStatus.PROCESSING;
     }
+
+    public void resetToPending() {
+        this.status = OutboxStatus.PENDING;
+        this.processedAt = null;
+    }
 }
