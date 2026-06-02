@@ -16,12 +16,8 @@ import org.hibernate.annotations.SQLRestriction;
 @AllArgsConstructor
 @Entity
 @Table(name = "cards",
-        uniqueConstraints = {
-                @UniqueConstraint(columnNames = {"tcgdex_id"})
-        },
         indexes = {
                 @Index(name = "idx_cards_status", columnList = "status"),
-                @Index(name = "idx_cards_user_id", columnList = "user_id"),
                 @Index(name = "idx_cards_user_id_status", columnList = "user_id, status"),
                 @Index(name = "idx_cards_grade", columnList = "grade"),
                 @Index(name = "idx_cards_category", columnList = "category"),

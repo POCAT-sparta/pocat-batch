@@ -63,6 +63,7 @@ public class AuctionRankingService {
 
         } catch (Exception e) {
             log.warn("경매 랭킹 갱신 실패", e);
+            throw new RuntimeException("경매 랭킹 갱신 실패", e);
         }
     }
 

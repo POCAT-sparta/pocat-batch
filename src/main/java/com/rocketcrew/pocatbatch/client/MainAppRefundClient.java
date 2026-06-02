@@ -47,22 +47,8 @@ public class MainAppRefundClient {
                 log.info("환불 재시도 성공: refundId={}", refundId);
                 return;
             } catch (HttpClientErrorException e) {
-                if (e.getStatusCode().is4xxClientError()) {
-                    log.warn("환불 재시도 4xx 오류: refundId={}, status={}", refundId, e.getStatusCode());
-                    throw new RuntimeException("4xx 오류로 스킵", e);
-                }
-                // 5xx 오류는 재시도
-                if (attempt == maxRetries) {
-                    log.error("환불 재시도 최대 재시도 초과: refundId={}", refundId, e);
-                    throw e;
-                }
-                try {
-                    Thread.sleep(delayMs);
-                    delayMs *= 2;
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
-                    throw new RuntimeException(ie);
-                }
+                log.warn("환불 재시도 4xx 오류: refundId={}, status={}", refundId, e.getStatusCode());
+                throw new RuntimeException("4xx 오류로 스킵", e);
             } catch (Exception e) {
                 if (attempt == maxRetries) {
                     log.error("환불 재시도 실패: refundId={}", refundId, e);

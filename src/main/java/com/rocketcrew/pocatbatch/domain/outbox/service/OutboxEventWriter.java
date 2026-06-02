@@ -1,5 +1,6 @@
 package com.rocketcrew.pocatbatch.domain.outbox.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rocketcrew.pocatbatch.domain.outbox.entity.OutboxEvent;
 import com.rocketcrew.pocatbatch.domain.outbox.repository.OutboxRepository;
@@ -34,11 +35,12 @@ public class OutboxEventWriter {
      * 객체를 JSON으로 변환하여 아웃박스에 저장합니다.
      */
     public void write(String topic, String partitionKey, String eventType, Object eventPayload) {
+        String payload;
         try {
-            String payload = objectMapper.writeValueAsString(eventPayload);
-            write(topic, partitionKey, eventType, payload);
-        } catch (Exception e) {
+            payload = objectMapper.writeValueAsString(eventPayload);
+        } catch (JsonProcessingException e) {
             throw new RuntimeException("이벤트 직렬화 실패: " + eventType, e);
         }
+        write(topic, partitionKey, eventType, payload);
     }
 }

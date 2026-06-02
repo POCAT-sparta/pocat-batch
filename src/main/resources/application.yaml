@@ -44,7 +44,7 @@ management:
 pocat:
   main-app:
     base-url: ${POCAT_API_BASE_URL:http://localhost:8080}
-    internal-token: ${POCAT_INTERNAL_TOKEN:dev-token}
+    internal-token: ${POCAT_INTERNAL_TOKEN}
   batch:
     ranking:
       free:

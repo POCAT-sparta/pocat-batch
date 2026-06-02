@@ -3,6 +3,7 @@ package com.rocketcrew.pocatbatch.config;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
+import org.redisson.config.SingleServerConfig;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -28,10 +29,11 @@ public class RedissonConfig {
     @Bean
     public RedissonClient redissonClient() {
         Config config = new Config();
-        String redisUrl = (redisPassword == null || redisPassword.isEmpty())
-                ? String.format("redis://%s:%d", redisHost, redisPort)
-                : String.format("redis://:%s@%s:%d", redisPassword, redisHost, redisPort);
-        config.useSingleServer().setAddress(redisUrl);
+        SingleServerConfig serverConfig = config.useSingleServer()
+                .setAddress(String.format("redis://%s:%d", redisHost, redisPort));
+        if (redisPassword != null && !redisPassword.isEmpty()) {
+            serverConfig.setPassword(redisPassword);
+        }
         return Redisson.create(config);
     }
 }

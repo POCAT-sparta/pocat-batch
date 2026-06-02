@@ -47,22 +47,8 @@ public class MainAppBuyoutClient {
                 log.info("경매 구매 확정 복구 성공: auctionId={}", auctionId);
                 return;
             } catch (HttpClientErrorException e) {
-                if (e.getStatusCode().is4xxClientError()) {
-                    log.warn("경매 구매 확정 복구 4xx 오류: auctionId={}, status={}", auctionId, e.getStatusCode());
-                    throw new RuntimeException("4xx 오류로 스킵", e);
-                }
-                // 5xx 오류는 재시도
-                if (attempt == maxRetries) {
-                    log.error("경매 구매 확정 복구 최대 재시도 초과: auctionId={}", auctionId, e);
-                    throw e;
-                }
-                try {
-                    Thread.sleep(delayMs);
-                    delayMs *= 2;
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
-                    throw new RuntimeException(ie);
-                }
+                log.warn("경매 구매 확정 복구 4xx 오류: auctionId={}, status={}", auctionId, e.getStatusCode());
+                throw new RuntimeException("4xx 오류로 스킵", e);
             } catch (Exception e) {
                 if (attempt == maxRetries) {
                     log.error("경매 구매 확정 복구 실패: auctionId={}", auctionId, e);

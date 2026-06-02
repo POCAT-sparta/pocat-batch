@@ -29,8 +29,12 @@ public class OutboxRelayJobConfig {
     public Job outboxRelayJob() {
         return new JobBuilder(JOB_NAME, jobRepository)
                 .start(outboxRelayStep())
-                .next(outboxReaperStep())
-                .next(outboxCleanupStep())
+                    .on("FAILED").to(outboxReaperStep())
+                .from(outboxRelayStep())
+                    .on("*").to(outboxReaperStep())
+                .from(outboxReaperStep())
+                    .on("*").to(outboxCleanupStep())
+                .end()
                 .build();
     }
 

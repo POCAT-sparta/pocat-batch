@@ -17,7 +17,7 @@ public interface RefundRepository extends JpaRepository<Refund, Long> {
      * 2) PROCESSING 중 updatedAt이 stuckBefore보다 오래된 것 (approveRefund DB 실패로 방치된 건)
      */
     @Query("SELECT r FROM Refund r WHERE " +
-           "(r.status = :retryable AND r.nextRetryAt <= :now) OR " +
+           "(r.status = :retryable AND (r.nextRetryAt IS NULL OR r.nextRetryAt <= :now)) OR " +
            "(r.status = :processing AND r.updatedAt < :stuckBefore)")
     List<Refund> findRetryableTargets(
             @Param("retryable") RefundStatus retryable,

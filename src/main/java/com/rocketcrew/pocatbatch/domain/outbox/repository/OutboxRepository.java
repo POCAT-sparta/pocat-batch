@@ -29,18 +29,14 @@ public interface OutboxRepository extends JpaRepository<OutboxEvent, Long> {
     );
 
     /**
-     * PROCESSING 상태에서 일정 시간 이상 멈춘 이벤트 조회 (Reaper용)
+     * PROCESSING 상태에서 일정 시간 이상 멈춘 이벤트 조회 (Reaper용, 최대 100건)
      */
-    @Query("SELECT e FROM OutboxEvent e WHERE e.status = :status AND e.processedAt < :before")
-    List<OutboxEvent> findByStatusAndProcessedAtBefore(
-            @Param("status") OutboxStatus status,
-            @Param("before") LocalDateTime before
-    );
+    List<OutboxEvent> findTop100ByStatusAndProcessedAtBefore(OutboxStatus status, LocalDateTime before);
 
     /**
      * 오래된 SENT 이벤트 삭제
      */
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("DELETE FROM OutboxEvent o WHERE o.status = :status AND o.createdAt < :cutoff")
     int deleteOldEvents(
             @Param("status") OutboxStatus status,

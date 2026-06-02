@@ -27,7 +27,7 @@ public class OutboxReaperTasklet implements Tasklet {
         try {
             LocalDateTime stuckBefore = LocalDateTime.now().minusMinutes(STUCK_MINUTES);
 
-            List<OutboxEvent> stuckEvents = outboxRepository.findByStatusAndProcessedAtBefore(
+            List<OutboxEvent> stuckEvents = outboxRepository.findTop100ByStatusAndProcessedAtBefore(
                     OutboxStatus.PROCESSING, stuckBefore
             );
 

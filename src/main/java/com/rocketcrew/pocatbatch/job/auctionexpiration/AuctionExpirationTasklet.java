@@ -39,7 +39,14 @@ public class AuctionExpirationTasklet implements Tasklet {
 
             for (Auction auction : expiredAuctions) {
                 RLock lock = redissonClient.getLock("auction:lock:" + auction.getId());
-                boolean locked = lock.tryLock(0, 30, TimeUnit.SECONDS);
+                boolean locked;
+                try {
+                    locked = lock.tryLock(0, 30, TimeUnit.SECONDS);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    log.warn("경매 종료 락 획득 중 인터럽트: auctionId={}", auction.getId());
+                    continue;
+                }
                 if (!locked) {
                     log.debug("경매 종료 락 실패 (이미 처리 중): auctionId={}", auction.getId());
                     continue;
@@ -51,7 +58,9 @@ public class AuctionExpirationTasklet implements Tasklet {
                 } catch (Exception e) {
                     log.error("경매 종료 실패: auctionId={}", auction.getId(), e);
                 } finally {
-                    lock.unlock();
+                    if (lock.isHeldByCurrentThread()) {
+                        lock.unlock();
+                    }
                 }
             }
 

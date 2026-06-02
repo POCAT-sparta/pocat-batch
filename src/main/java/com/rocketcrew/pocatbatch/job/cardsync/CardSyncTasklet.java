@@ -20,6 +20,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.Optional;
+
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -82,7 +84,9 @@ public class CardSyncTasklet implements Tasklet {
         for (JsonNode cardNode : cardNodes) {
             String tcgdexId = cardNode.path("id").asText();
 
-            if (cardRepository.existsByTcgdexId(tcgdexId)) {
+            Optional<Card> existing = cardRepository.findByTcgdexIdIncludingDeleted(tcgdexId);
+            if (existing.isPresent()) {
+                // soft-deleted 포함 이미 존재 → skip (soft-deleted여도 tcgdex_id 중복이므로 skip)
                 continue;
             }
 

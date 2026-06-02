@@ -5,6 +5,7 @@ import com.rocketcrew.pocatbatch.domain.series.entity.Series;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
 
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -12,6 +13,7 @@ import org.hibernate.annotations.SQLDelete;
 @AllArgsConstructor
 @Entity
 @SQLDelete(sql = "UPDATE pokemon_sets SET deleted_at = NOW() WHERE id = ?")
+@SQLRestriction("deleted_at IS NULL")
 @Table(name = "pokemon_sets",
         uniqueConstraints = @UniqueConstraint(columnNames = "set_id"))
 public class PokemonSet extends BaseEntity {
