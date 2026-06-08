@@ -24,4 +24,6 @@ public interface RefundRepository extends JpaRepository<Refund, Long> {
             @Param("now") LocalDateTime now,
             @Param("processing") RefundStatus processing,
             @Param("stuckBefore") LocalDateTime stuckBefore);
+
+    boolean existsByOrderIdAndStatusIn(Long orderId, java.util.List<RefundStatus> statuses);
 }
