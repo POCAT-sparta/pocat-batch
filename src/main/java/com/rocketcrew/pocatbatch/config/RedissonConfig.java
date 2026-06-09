@@ -4,6 +4,7 @@ import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.util.StringUtils;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
@@ -29,14 +30,14 @@ public class RedissonConfig {
     public RedissonClient redissonClient() {
         Config config = new Config();
         var clusterConfig = config.useClusterServers()
-                .addNodeAddress(clusterNodes.stream()
-                        .map(node -> "redis://" + node)
-                        .toArray(String[]::new));
-
+                .addNodeAddress(
+                        clusterNodes.stream()
+                                .map(node -> "redis://" + node)
+                                .toArray(String[]::new)
+                );
         if (StringUtils.hasText(redisPassword)) {
             clusterConfig.setPassword(redisPassword);
         }
-
         return Redisson.create(config);
     }
 }

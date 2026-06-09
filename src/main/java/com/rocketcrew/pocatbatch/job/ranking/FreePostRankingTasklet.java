@@ -23,8 +23,8 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class FreePostRankingTasklet implements Tasklet {
 
-    public static final String RANKING_KEY = "ranking:free:popular";
-    private static final String RANKING_NEW_KEY = "ranking:free:popular:new";
+    public static final String RANKING_KEY = "{ranking:free}:popular";
+    private static final String RANKING_NEW_KEY = "{ranking:free}:popular:new";
 
     private final StringRedisTemplate redisTemplate;
     private final FreePostRepository freePostRepository;
