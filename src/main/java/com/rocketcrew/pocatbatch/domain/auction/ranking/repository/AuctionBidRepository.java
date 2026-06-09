@@ -12,4 +12,10 @@ public interface AuctionBidRepository extends JpaRepository<AuctionBid, Long> {
 
     @Query("SELECT b.auctionId AS auctionId, COUNT(b) AS cnt FROM AuctionBid b WHERE b.auctionId IN :auctionIds GROUP BY b.auctionId")
     List<AuctionCountProjection> countByAuctionIdIn(@Param("auctionIds") List<Long> auctionIds);
+
+    `@Query`("SELECT DISTINCT b.userId FROM AuctionBid b WHERE b.auctionId = :auctionId AND b.userId <> :winnerId ORDER BY b.userId")
+    List<Long> findLoserIdsByAuctionIdExcluding(`@Param`("auctionId") Long auctionId, `@Param`("winnerId") Long winnerId);
+
+    `@Query`("SELECT DISTINCT b.userId FROM AuctionBid b WHERE b.auctionId = :auctionId ORDER BY b.userId")
+    List<Long> findAllBidderIdsByAuctionId(`@Param`("auctionId") Long auctionId);
 }
