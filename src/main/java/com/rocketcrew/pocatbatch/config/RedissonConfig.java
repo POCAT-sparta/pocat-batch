@@ -3,21 +3,20 @@ package com.rocketcrew.pocatbatch.config;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
-import org.redisson.config.SingleServerConfig;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.springframework.util.StringUtils;
+
+import java.util.List;
 
 @Profile("!test")
 @Configuration
 public class RedissonConfig {
 
-    @Value("${spring.data.redis.host:localhost}")
-    private String redisHost;
-
-    @Value("${spring.data.redis.port:6379}")
-    private int redisPort;
+    @Value("${spring.data.redis.cluster.nodes}")
+    private List<String> clusterNodes;
 
     @Value("${spring.data.redis.password:}")
     private String redisPassword;
@@ -29,11 +28,15 @@ public class RedissonConfig {
     @Bean
     public RedissonClient redissonClient() {
         Config config = new Config();
-        SingleServerConfig serverConfig = config.useSingleServer()
-                .setAddress(String.format("redis://%s:%d", redisHost, redisPort));
-        if (redisPassword != null && !redisPassword.isEmpty()) {
-            serverConfig.setPassword(redisPassword);
+        var clusterConfig = config.useClusterServers()
+                .addNodeAddress(clusterNodes.stream()
+                        .map(node -> "redis://" + node)
+                        .toArray(String[]::new));
+
+        if (StringUtils.hasText(redisPassword)) {
+            clusterConfig.setPassword(redisPassword);
         }
+
         return Redisson.create(config);
     }
 }

@@ -1,0 +1,49 @@
+spring:
+  config:
+    activate:
+      on-profile: prod
+    import: "aws-parameterstore:/pocat/prod/"
+
+  cloud:
+    aws:
+      region:
+        static: ${AWS_REGION:ap-northeast-2}
+
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: ${DB_DRIVER:com.mysql.cj.jdbc.Driver}
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+  data:
+    redis:
+      cluster:
+        nodes: ${REDIS_CLUSTER_NODES}
+        max-redirects: ${REDIS_CLUSTER_MAX_REDIRECTS:3}
+      password: ${REDIS_PASSWORD}
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+
+  batch:
+    jdbc:
+      initialize-schema: always
+
+server:
+  port: ${BATCH_SERVER_PORT:8081}
+
+pocat:
+  main-app:
+    base-url: ${POCAT_API_BASE_URL}
+    internal-token: ${POCAT_INTERNAL_TOKEN}
+  batch:
+    card-sync:
+      admin-user-id: ${CARD_SYNC_ADMIN_USER_ID:1}
+
+outbox:
+  relay:
+    age-threshold-seconds: ${OUTBOX_AGE_THRESHOLD_SECONDS:10}

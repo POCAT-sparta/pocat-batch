@@ -1,12 +1,8 @@
 spring:
   application:
     name: pocat-batch
-
-  datasource:
-    url: ${DB_URL}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
-    driver-class-name: ${DB_DRIVER:com.mysql.cj.jdbc.Driver}
+  profiles:
+    default: local
 
   jpa:
     hibernate:
@@ -17,23 +13,11 @@ spring:
         format_sql: true
         dialect: org.hibernate.dialect.MySQLDialect
 
-  data:
-    redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
-
-  kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-
   batch:
     jdbc:
       initialize-schema: always
     job:
       enabled: false
-
-server:
-  port: ${BATCH_SERVER_PORT:8081}
 
 management:
   endpoints:
@@ -42,9 +26,6 @@ management:
         include: health,info,metrics
 
 pocat:
-  main-app:
-    base-url: ${POCAT_API_BASE_URL:http://localhost:8080}
-    internal-token: ${POCAT_INTERNAL_TOKEN}
   batch:
     ranking:
       free:
@@ -53,8 +34,8 @@ pocat:
         popular-days: 7
         comment-weight: 3
     card-sync:
-      admin-user-id: ${CARD_SYNC_ADMIN_USER_ID:1}
+      admin-user-id: 1
 
 outbox:
   relay:
-    age-threshold-seconds: ${OUTBOX_AGE_THRESHOLD_SECONDS:10}
+    age-threshold-seconds: 10
