@@ -12,6 +12,7 @@ import com.rocketcrew.pocatbatch.job.ranking.FreePostRankingJobConfig;
 import com.rocketcrew.pocatbatch.job.refundretry.RefundRetryJobConfig;
 import com.rocketcrew.pocatbatch.job.viewcount.ViewCountFlushJobConfig;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.JobExecution;
@@ -70,51 +71,61 @@ public class BatchScheduler {
     }
 
     @Scheduled(fixedDelay = 60_000)
+    @SchedulerLock(name = "freePostRankingJob", lockAtMostFor = "PT50S", lockAtLeastFor = "PT5S")
     public void runFreePostRanking() {
         launch(freePostRankingJob, "freePostRankingJob");
     }
 
     @Scheduled(fixedDelay = 60_000)
+    @SchedulerLock(name = "viewCountFlushJob", lockAtMostFor = "PT50S", lockAtLeastFor = "PT5S")
     public void runViewCountFlush() {
         launch(viewCountFlushJob, "viewCountFlushJob");
     }
 
     @Scheduled(fixedRate = 300_000)
+    @SchedulerLock(name = "aiSessionCleanupJob", lockAtMostFor = "PT4M", lockAtLeastFor = "PT10S")
     public void runAiSessionCleanup() {
         launch(aiSessionCleanupJob, "aiSessionCleanupJob");
     }
 
     @Scheduled(fixedDelay = 60_000)
+    @SchedulerLock(name = "auctionRankingJob", lockAtMostFor = "PT50S", lockAtLeastFor = "PT5S")
     public void runAuctionRanking() {
         launch(auctionRankingJob, "auctionRankingJob");
     }
 
     @Scheduled(fixedDelay = 5_000)
+    @SchedulerLock(name = "outboxRelayJob", lockAtMostFor = "PT4S", lockAtLeastFor = "PT1S")
     public void runOutboxRelay() {
         launch(outboxRelayJob, "outboxRelayJob");
     }
 
     @Scheduled(cron = "0 0 0 * * SUN", zone = "Asia/Seoul")
+    @SchedulerLock(name = "cardSyncJob", lockAtMostFor = "PT2H", lockAtLeastFor = "PT1M")
     public void runCardSync() {
         launch(cardSyncJob, "cardSyncJob");
     }
 
     @Scheduled(cron = "0 0 19 * * *", zone = "Asia/Seoul")
+    @SchedulerLock(name = "auctionActivationJob", lockAtMostFor = "PT30M", lockAtLeastFor = "PT1M")
     public void runAuctionActivation() {
         launch(auctionActivationJob, "auctionActivationJob");
     }
 
     @Scheduled(cron = "0 5-30 19 * * *", zone = "Asia/Seoul")
+    @SchedulerLock(name = "auctionExpirationJob", lockAtMostFor = "PT50S", lockAtLeastFor = "PT5S")
     public void runAuctionExpiration() {
         launch(auctionExpirationJob, "auctionExpirationJob");
     }
 
     @Scheduled(fixedDelay = 60_000)
+    @SchedulerLock(name = "buyoutRecoveryJob", lockAtMostFor = "PT50S", lockAtLeastFor = "PT5S")
     public void runBuyoutRecovery() {
         launch(buyoutRecoveryJob, "buyoutRecoveryJob");
     }
 
     @Scheduled(fixedDelay = 60_000)
+    @SchedulerLock(name = "refundRetryJob", lockAtMostFor = "PT50S", lockAtLeastFor = "PT5S")
     public void runRefundRetry() {
         launch(refundRetryJob, "refundRetryJob");
     }
