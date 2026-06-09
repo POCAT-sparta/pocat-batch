@@ -31,7 +31,7 @@ public class AuctionRankingService {
     private final AuctionBidRepository auctionBidRepository;
     private final AuctionRankingProperties properties;
 
-    static final String RANKING_KEY = "ranking:auction:popular";
+    static final String RANKING_KEY = "{ranking:auction}:popular";
 
     public void refreshRanking() {
         try {

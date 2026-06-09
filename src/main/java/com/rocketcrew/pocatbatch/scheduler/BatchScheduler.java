@@ -6,6 +6,7 @@ import com.rocketcrew.pocatbatch.job.auctionexpiration.AuctionExpirationJobConfi
 import com.rocketcrew.pocatbatch.job.auctionranking.AuctionRankingJobConfig;
 import com.rocketcrew.pocatbatch.job.buyoutrecovery.BuyoutRecoveryJobConfig;
 import com.rocketcrew.pocatbatch.job.cardsync.CardSyncJobConfig;
+import com.rocketcrew.pocatbatch.job.ordercompletion.OrderCompletionJobConfig;
 import com.rocketcrew.pocatbatch.job.outboxrelay.OutboxRelayJobConfig;
 import com.rocketcrew.pocatbatch.job.ranking.FreePostRankingJobConfig;
 import com.rocketcrew.pocatbatch.job.refundretry.RefundRetryJobConfig;
@@ -38,6 +39,7 @@ public class BatchScheduler {
     private final Job auctionExpirationJob;
     private final Job buyoutRecoveryJob;
     private final Job refundRetryJob;
+    private final Job orderCompletionJob;
 
     // @RequiredArgsConstructor는 @Qualifier 미지원 → 수동 생성자 필수
     public BatchScheduler(
@@ -51,7 +53,8 @@ public class BatchScheduler {
             @Qualifier(AuctionActivationJobConfig.JOB_NAME) Job auctionActivationJob,
             @Qualifier(AuctionExpirationJobConfig.JOB_NAME) Job auctionExpirationJob,
             @Qualifier(BuyoutRecoveryJobConfig.JOB_NAME) Job buyoutRecoveryJob,
-            @Qualifier(RefundRetryJobConfig.JOB_NAME) Job refundRetryJob) {
+            @Qualifier(RefundRetryJobConfig.JOB_NAME) Job refundRetryJob,
+            @Qualifier(OrderCompletionJobConfig.JOB_NAME) Job orderCompletionJob) {
         this.jobLauncher           = jobLauncher;
         this.freePostRankingJob    = freePostRankingJob;
         this.viewCountFlushJob     = viewCountFlushJob;
@@ -63,6 +66,7 @@ public class BatchScheduler {
         this.auctionExpirationJob  = auctionExpirationJob;
         this.buyoutRecoveryJob     = buyoutRecoveryJob;
         this.refundRetryJob        = refundRetryJob;
+        this.orderCompletionJob    = orderCompletionJob;
     }
 
     @Scheduled(fixedDelay = 60_000)
@@ -113,6 +117,11 @@ public class BatchScheduler {
     @Scheduled(fixedDelay = 60_000)
     public void runRefundRetry() {
         launch(refundRetryJob, "refundRetryJob");
+    }
+
+    @Scheduled(cron = "0 0 2 * * *", zone = "Asia/Seoul")
+    public void runOrderCompletion() {
+        launch(orderCompletionJob, "orderCompletionJob");
     }
 
     private void launch(Job job, String label) {

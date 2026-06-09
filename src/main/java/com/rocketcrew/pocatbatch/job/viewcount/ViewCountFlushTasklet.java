@@ -19,10 +19,10 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class ViewCountFlushTasklet implements Tasklet {
 
-    private static final String FREE_BUFFER_KEY             = "view:free:buffer";
-    private static final String FREE_PROCESSING_KEY         = "view:free:buffer:processing";
-    private static final String FREE_COMMENT_BUFFER_KEY     = "comment:free:buffer";
-    private static final String FREE_COMMENT_PROCESSING_KEY = "comment:free:buffer:processing";
+    private static final String FREE_BUFFER_KEY             = "{view:free}:buffer";
+    private static final String FREE_PROCESSING_KEY         = "{view:free}:buffer:processing";
+    private static final String FREE_COMMENT_BUFFER_KEY     = "{comment:free}:buffer";
+    private static final String FREE_COMMENT_PROCESSING_KEY = "{comment:free}:buffer:processing";
 
     private final StringRedisTemplate redisTemplate;
     private final FreePostFlushService flushService;
