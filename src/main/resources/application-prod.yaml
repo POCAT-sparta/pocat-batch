@@ -31,7 +31,7 @@ spring:
 
   batch:
     jdbc:
-      initialize-schema: always
+      initialize-schema: never
 
 server:
   port: ${BATCH_SERVER_PORT:8081}
