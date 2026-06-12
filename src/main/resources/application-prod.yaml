@@ -47,3 +47,9 @@ pocat:
 outbox:
   relay:
     age-threshold-seconds: ${OUTBOX_AGE_THRESHOLD_SECONDS:10}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, prometheus, metrics
