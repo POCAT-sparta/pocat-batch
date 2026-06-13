@@ -43,11 +43,15 @@ class MainAiReindexClientTest {
 
         String responseBody = """
                 {
-                  "processedCount": 3,
-                  "skippedCount": 0,
-                  "indexedCount": 3,
-                  "failedCount": 0,
-                  "rateLimited": false
+                  "success": true,
+                  "status": 200,
+                  "data": {
+                    "processedCount": 3,
+                    "skippedCount": 0,
+                    "indexedCount": 3,
+                    "failedCount": 0,
+                    "rateLimited": false
+                  }
                 }
                 """;
 
@@ -69,6 +73,40 @@ class MainAiReindexClientTest {
     }
 
     @Test
+    void reindexChunk_rateLimited가_true인_응답을_언래핑하여_그대로_전달한다() {
+        // given
+        List<Long> cardIds = List.of(1L, 2L, 3L);
+        long jobExecutionId = 150L;
+
+        String responseBody = """
+                {
+                  "success": true,
+                  "status": 200,
+                  "data": {
+                    "processedCount": 0,
+                    "skippedCount": 3,
+                    "indexedCount": 0,
+                    "failedCount": 0,
+                    "rateLimited": true
+                  }
+                }
+                """;
+
+        mockServer.expect(requestTo(BASE_URL + "/internal/ai/reindex-cards"))
+                .andExpect(method(org.springframework.http.HttpMethod.POST))
+                .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
+
+        // when
+        ReindexChunkResponse response = mainAiReindexClient.reindexChunk(cardIds, jobExecutionId);
+
+        // then
+        assertThat(response.rateLimited()).isTrue();
+        assertThat(response.skippedCount()).isEqualTo(3);
+
+        mockServer.verify();
+    }
+
+    @Test
     void reindexChunk_요청_헤더에_X_Internal_Token과_Idempotency_Key를_포함한다() {
         // given
         List<Long> cardIds = List.of(10L, 11L, 12L);
@@ -77,11 +115,15 @@ class MainAiReindexClientTest {
 
         String responseBody = """
                 {
-                  "processedCount": 3,
-                  "skippedCount": 0,
-                  "indexedCount": 3,
-                  "failedCount": 0,
-                  "rateLimited": false
+                  "success": true,
+                  "status": 200,
+                  "data": {
+                    "processedCount": 3,
+                    "skippedCount": 0,
+                    "indexedCount": 3,
+                    "failedCount": 0,
+                    "rateLimited": false
+                  }
                 }
                 """;
 

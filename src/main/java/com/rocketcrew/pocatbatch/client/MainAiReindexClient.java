@@ -1,12 +1,15 @@
 package com.rocketcrew.pocatbatch.client;
 
+import com.rocketcrew.pocatbatch.client.dto.ApiResponseEnvelope;
 import com.rocketcrew.pocatbatch.client.dto.ReindexChunkResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
@@ -50,8 +53,10 @@ public class MainAiReindexClient {
 
         for (int attempt = 1; attempt <= maxRetries; attempt++) {
             try {
-                ReindexChunkResponse response = restTemplate.exchange(
-                        url, HttpMethod.POST, request, ReindexChunkResponse.class).getBody();
+                ResponseEntity<ApiResponseEnvelope<ReindexChunkResponse>> responseEntity = restTemplate.exchange(
+                        url, HttpMethod.POST, request,
+                        new ParameterizedTypeReference<ApiResponseEnvelope<ReindexChunkResponse>>() {});
+                ReindexChunkResponse response = responseEntity.getBody().data();
                 log.info("AI 카드 리인덱스 요청 성공: cardIds={}, response={}", cardIds, response);
                 return response;
             } catch (HttpClientErrorException e) {
