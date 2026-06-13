@@ -1,5 +1,6 @@
 package com.rocketcrew.pocatbatch.scheduler;
 
+import com.rocketcrew.pocatbatch.job.aireindex.AiReindexJobConfig;
 import com.rocketcrew.pocatbatch.job.aisession.AiSessionCleanupJobConfig;
 import com.rocketcrew.pocatbatch.job.auctionactivation.AuctionActivationJobConfig;
 import com.rocketcrew.pocatbatch.job.auctionexpiration.AuctionExpirationJobConfig;
@@ -41,6 +42,7 @@ public class BatchScheduler {
     private final Job buyoutRecoveryJob;
     private final Job refundRetryJob;
     private final Job orderCompletionJob;
+    private final Job aiReindexJob;
 
     // @RequiredArgsConstructor는 @Qualifier 미지원 → 수동 생성자 필수
     public BatchScheduler(
@@ -55,7 +57,8 @@ public class BatchScheduler {
             @Qualifier(AuctionExpirationJobConfig.JOB_NAME) Job auctionExpirationJob,
             @Qualifier(BuyoutRecoveryJobConfig.JOB_NAME) Job buyoutRecoveryJob,
             @Qualifier(RefundRetryJobConfig.JOB_NAME) Job refundRetryJob,
-            @Qualifier(OrderCompletionJobConfig.JOB_NAME) Job orderCompletionJob) {
+            @Qualifier(OrderCompletionJobConfig.JOB_NAME) Job orderCompletionJob,
+            @Qualifier(AiReindexJobConfig.JOB_NAME) Job aiReindexJob) {
         this.jobLauncher           = jobLauncher;
         this.freePostRankingJob    = freePostRankingJob;
         this.viewCountFlushJob     = viewCountFlushJob;
@@ -68,6 +71,7 @@ public class BatchScheduler {
         this.buyoutRecoveryJob     = buyoutRecoveryJob;
         this.refundRetryJob        = refundRetryJob;
         this.orderCompletionJob    = orderCompletionJob;
+        this.aiReindexJob          = aiReindexJob;
     }
 
     @Scheduled(fixedDelay = 60_000)
@@ -133,6 +137,12 @@ public class BatchScheduler {
     @Scheduled(cron = "0 0 2 * * *", zone = "Asia/Seoul")
     public void runOrderCompletion() {
         launch(orderCompletionJob, "orderCompletionJob");
+    }
+
+    @Scheduled(cron = "0 0 1 * * *", zone = "Asia/Seoul")
+    @SchedulerLock(name = "aiReindexJob", lockAtMostFor = "PT3H", lockAtLeastFor = "PT1M")
+    public void runAiReindex() {
+        launch(aiReindexJob, "aiReindexJob");
     }
 
     private void launch(Job job, String label) {
