@@ -168,6 +168,8 @@ BatchScheduler(@Scheduled cron, 저빈도)
                       └─ cursor 갱신 후 다음 청크 반복 (조기종료 조건 충족 시 종료)
 ```
 
+> `MainAiReindexClient`는 응답을 `ApiResponseEnvelope<ReindexChunkResponse>`로 언래핑하여 `data` 필드를 추출한다 (POCAT의 `ApiResponseDto`/`SuccessDto` 표준 응답 포맷과 일치).
+
 ### Internal API 위임 대상
 
 | Tasklet | 위임 엔드포인트 | 비고 |
