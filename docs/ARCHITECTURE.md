@@ -131,6 +131,67 @@ MySQL에 자동 생성되는 `BATCH_*` 테이블로 Job 실행 이력을 영속 
 | Actuator 노출 | `health, info, metrics` 최소 범위만 노출 |
 | `.env` 파일 | `.gitignore` 에 포함 — Git 커밋 방지 |
 
+## aiReindexJob (ADR-018, #222)
+
+> POCAT 메인 백엔드의 `AdminAiService.reindexAll()`(관리자 수동 트리거) 방식을 대체하는 스케줄 배치. ACTIVE 카드 중 ES(`pocat-ai-index`)에 미인덱싱된 카드를 cursor 기반으로 청크 처리하여 메인 백엔드 internal API에 위임한다.
+
+### 목적
+
+- AI 카드 임베딩 재색인을 관리자 수동 트리거 없이 주기적으로 자동 실행
+- Gemini rate-limit(100/min) 초과로 인한 비일률적 skip 동작을 분산 rate-limit(`RedisRateLimiter`, 80/60s)로 완화
+- 4만 장 이상 대량 처리를 단일 요청이 아닌 100개 단위 청크로 분할하여 서버 부하 분산
+
+### 패키지 구성 (예정)
+
+```text
+job/aireindex/
+├── AiReindexJobConfig      # aiReindexJob, aiReindexStep 빈 등록
+└── AiReindexTasklet        # cursor 기반 카드ID 청크 조회 + internal API 호출
+client/
+└── MainAiReindexClient     # POST /internal/ai/reindex-cards 호출 클라이언트
+```
+
+### 처리 흐름
+
+```text
+BatchScheduler(@Scheduled cron, 저빈도)
+  └─ runAiReindex()
+       └─ JobLauncher.run(aiReindexJob)
+            └─ aiReindexStep
+                 └─ AiReindexTasklet
+                      ├─ CardRepository.findActiveCardIdsAfter(cursor, size=100) — ACTIVE 카드ID 100개 청크 조회
+                      ├─ MainAiReindexClient.reindexChunk(cardIds, jobExecutionId)
+                      │    └─ POST /internal/ai/reindex-cards
+                      │         (X-Internal-Token, Idempotency-Key=reindex-cards-{firstCardId}-{lastCardId}-{jobExecutionId})
+                      │         → ApiResponseDto<ReindexChunkResponse>
+                      │              (processedCount, skippedCount, indexedCount, failedCount, rateLimited)
+                      └─ cursor 갱신 후 다음 청크 반복 (조기종료 조건 충족 시 종료)
+```
+
+> `MainAiReindexClient`는 응답을 `ApiResponseEnvelope<ReindexChunkResponse>`로 언래핑하여 `data` 필드를 추출한다 (POCAT의 `ApiResponseDto`/`SuccessDto` 표준 응답 포맷과 일치).
+
+### Internal API 위임 대상
+
+| Tasklet | 위임 엔드포인트 | 비고 |
+|---------|----------------|------|
+| `AiReindexTasklet` | `POST /internal/ai/reindex-cards` | ADR-014 전략 C(internal API 위임) 동일 패턴. 청크(최대 100개 cardId) body 전달, `X-Internal-Token` + `Idempotency-Key` + 3회 재시도/4xx-skip |
+
+### 조기종료 조건
+
+다음 중 하나라도 충족하면 해당 회차의 카드ID 청크 순회를 중단한다.
+
+- 메인 백엔드 응답의 `rateLimited: true` — `RedisRateLimiter`(80/60s) 한도 도달
+- `findActiveCardIdsAfter`가 더 이상 카드ID를 반환하지 않음 (cursor 끝 도달)
+- internal API 호출이 재시도 3회 모두 실패 (네트워크/5xx)
+
+### 인덱싱 완료 판정
+
+DB 컬럼을 추가하지 않고 ES 문서 존재 여부(`metadata.cardId.keyword`)로만 판정한다. 실패한 카드는 ES 미반영 상태로 남아 다음 배치 회차에 자동 재시도된다(self-healing).
+
+> 상세 설계 결정 및 대안 검토는 [ADR-018: AI 카드 임베딩 재색인 스케줄 배치 이전](../../POCAT/docs/adr/ADR-018-ai-card-reindex-batch-migration-%23222.md) 참고.
+
+---
+
 ## 알려진 한계 (Known Limitations)
 
 | 항목 | 내용 | 대응 방안 |

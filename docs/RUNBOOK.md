@@ -33,6 +33,8 @@ cp .env.example .env
 | `REDIS_HOST` | Redis 호스트 | `localhost` |
 | `REDIS_PORT` | Redis 포트 | `6379` |
 | `BATCH_SERVER_PORT` | 배치 서버 HTTP 포트 (메인 앱과 충돌 방지) | `8081` |
+| `POCAT_API_BASE_URL` | POCAT 메인 백엔드 base URL (`Main*Client`가 internal API 호출 시 사용) | `http://localhost:8080` |
+| `POCAT_INTERNAL_TOKEN` | POCAT 메인 백엔드 internal API 인증 토큰 (`X-Internal-Token` 헤더) | (메인 백엔드와 동일한 값으로 설정) |
 
 ---
 
@@ -72,6 +74,20 @@ SHOW TABLES LIKE 'BATCH_%';
 별도의 HTTP 엔드포인트나 CLI 트리거는 제공하지 않는다.
 
 **수동으로 즉시 실행하려면**: 애플리케이션을 재시작하면 시작 60초 후 첫 번째 Job이 실행된다.
+
+---
+
+## 등록된 스케줄 Job
+
+### aiReindexJob (ADR-018, #222)
+
+- **실행 주기**: 매일 01:00 (Asia/Seoul)
+- **중복 실행 방지**: ShedLock 적용
+- **동작**: ACTIVE 카드 ID를 cursor 기반으로 100개씩 청크로 묶어 POCAT 메인 백엔드 `/internal/ai/reindex-cards`에 위임. ES(`pocat-ai-index`)에 이미 인덱싱된 카드는 스킵.
+- **조기 종료**: 메인 백엔드 응답에서 Gemini rate-limit(`rateLimited=true`) 도달 시 해당 실행을 조기 종료한다. 미처리 카드는 다음 실행에서 자가치유(self-healing)된다.
+- **모니터링 포인트**:
+  - Gemini API 사용량 및 `rateLimited` 도달 빈도
+  - ES `pocat-ai-index` 인덱싱된 카드 수 증가 추이
 
 ---
 
