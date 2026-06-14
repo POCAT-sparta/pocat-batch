@@ -51,6 +51,10 @@ public class AiReindexTasklet implements Tasklet {
                     break;
                 }
             } catch (Exception e) {
+                if (Thread.currentThread().isInterrupted()) {
+                    log.warn("AI 카드 리인덱스 작업이 인터럽트되어 중단됩니다. lastId={}", lastId);
+                    break;
+                }
                 log.warn("AI 카드 리인덱스 청크 처리 실패: cardIds={}", cardIds, e);
             }
 

@@ -56,9 +56,18 @@ public class MainAiReindexClient {
                 ResponseEntity<ApiResponseEnvelope<ReindexChunkResponse>> responseEntity = restTemplate.exchange(
                         url, HttpMethod.POST, request,
                         new ParameterizedTypeReference<ApiResponseEnvelope<ReindexChunkResponse>>() {});
-                ReindexChunkResponse response = responseEntity.getBody().data();
-                log.info("AI 카드 리인덱스 요청 성공: cardIds={}, response={}", cardIds, response);
-                return response;
+                ApiResponseEnvelope<ReindexChunkResponse> body = responseEntity.getBody();
+                if (body == null) {
+                    throw new IllegalStateException("AI 카드 리인덱스 응답 본문이 null입니다: cardIds=" + cardIds);
+                }
+                if (!body.success()) {
+                    throw new IllegalStateException("AI 카드 리인덱스 요청이 실패했습니다: status=" + body.status() + ", cardIds=" + cardIds);
+                }
+                if (body.data() == null) {
+                    throw new IllegalStateException("AI 카드 리인덱스 응답 데이터가 null입니다: cardIds=" + cardIds);
+                }
+                log.info("AI 카드 리인덱스 요청 성공: cardIds={}, response={}", cardIds, body.data());
+                return body.data();
             } catch (HttpClientErrorException e) {
                 log.warn("AI 카드 리인덱스 4xx 오류: cardIds={}, status={}", cardIds, e.getStatusCode());
                 throw new RuntimeException("4xx 오류로 스킵", e);
