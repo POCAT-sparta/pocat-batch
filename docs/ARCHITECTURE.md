@@ -148,7 +148,7 @@ job/aireindex/
 ├── AiReindexJobConfig      # aiReindexJob, aiReindexStep 빈 등록
 └── AiReindexTasklet        # cursor 기반 카드ID 청크 조회 + internal API 호출
 client/
-└── MainAppAiClient         # POST /internal/ai/reindex-cards 호출 클라이언트
+└── MainAiReindexClient     # POST /internal/ai/reindex-cards 호출 클라이언트
 ```
 
 ### 처리 흐름
@@ -160,7 +160,7 @@ BatchScheduler(@Scheduled cron, 저빈도)
             └─ aiReindexStep
                  └─ AiReindexTasklet
                       ├─ CardRepository.findActiveCardIdsAfter(cursor, size=100) — ACTIVE 카드ID 100개 청크 조회
-                      ├─ MainAppAiClient.reindexCards(cardIds, jobExecutionId)
+                      ├─ MainAiReindexClient.reindexChunk(cardIds, jobExecutionId)
                       │    └─ POST /internal/ai/reindex-cards
                       │         (X-Internal-Token, Idempotency-Key=reindex-cards-{firstCardId}-{lastCardId}-{jobExecutionId})
                       │         → ApiResponseDto<ReindexChunkResponse>
