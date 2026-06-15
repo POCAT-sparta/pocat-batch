@@ -79,6 +79,60 @@ SHOW TABLES LIKE 'BATCH_%';
 
 ## 등록된 스케줄 Job
 
+### auctionActivationJob (#235)
+
+- **실행 주기**: 매일 19:00 (Asia/Seoul) — `cron = "0 0 19 * * *"`
+- **중복 실행 방지**: ShedLock 적용 (`lockAtMostFor = PT30M`)
+- **동작**: DB에서 `APPROVED` 상태 경매 목록을 조회한 뒤, 건별로 메인앱 `POST /internal/auctions/{id}/activate` 호출. 응답 `data: true` → 활성화 성공, `false` → 스킵.
+- **주요 변경 (#235)**: 기존 배치 서버 내 자체 도메인 로직 제거 → 메인앱 Internal API 위임으로 전환.
+- **의존성**: 메인앱 POCAT 먼저 배포 필요 (internal API 엔드포인트 존재 확인).
+- **재시도**: 5xx·네트워크 오류 시 지수 백오프 최대 3회. 4xx 오류는 즉시 RuntimeException → 해당 경매 스킵.
+- **오류 진단**:
+  - 401 → `POCAT_INTERNAL_TOKEN` 환경변수와 메인앱 설정값 일치 여부 확인
+  - 500 → 메인앱 로그 확인 (`/internal/auctions/{id}/activate`)
+- **모니터링 포인트**:
+  - 배치 로그의 `활성화={}, 스킵={}, 실패={}` 카운터
+  - `failedCount > 0` 시 메인앱 경매 서비스 이상 여부 점검
+
+---
+
+### auctionExpirationJob (#235)
+
+- **실행 주기**: 매일 19:05~19:30 매분 (Asia/Seoul) — `cron = "0 5-30 19 * * *"`
+- **중복 실행 방지**: ShedLock 적용 (`lockAtMostFor = PT50S`)
+- **동작**: DB에서 `ACTIVE` 상태이고 `endedAt <= now()`인 경매 목록을 조회한 뒤, 건별로 메인앱 `POST /internal/auctions/{id}/close-expired` 호출.
+- **주요 변경 (#235)**: 기존 배치 서버 내 자체 도메인 로직 제거 → 메인앱 Internal API 위임으로 전환.
+- **의존성**: 메인앱 POCAT 먼저 배포 필요.
+- **재시도**: 5xx·네트워크 오류 시 지수 백오프 최대 3회. 4xx 오류는 즉시 RuntimeException → 해당 경매 스킵.
+- **오류 진단**:
+  - 401 → `POCAT_INTERNAL_TOKEN` 환경변수 확인
+  - 500 → 메인앱 로그 확인 (`/internal/auctions/{id}/close-expired`)
+- **모니터링 포인트**:
+  - 배치 로그의 `종료={}, 스킵={}, 실패={}` 카운터
+  - `failedCount > 0` 연속 발생 시 메인앱 경매 만료 처리 로직 점검
+
+---
+
+### cardSyncJob (#235)
+
+- **실행 주기**: 매주 일요일 00:00 (Asia/Seoul) — `cron = "0 0 0 * * SUN"`
+- **중복 실행 방지**: ShedLock 적용 (`lockAtMostFor = PT2H`)
+- **동작**: 메인앱 `POST /internal/cards/sync` 트리거 요청 1회 발송. 실제 카드 동기화는 메인앱 `syncExecutor`에서 비동기 실행.
+- **주요 변경 (#235)**: 기존 배치 서버 내 자체 카드 동기화 로직 제거 → 메인앱 Internal API 위임으로 전환.
+- **의존성**: 메인앱 POCAT 먼저 배포 필요.
+- **특이사항 (정상 동작)**:
+  - `202 Accepted` → 정상 트리거 완료 (비동기 처리 시작됨)
+  - `409 CARD_SYNC_IN_PROGRESS` → 이미 동기화 진행 중 — **정상 스킵** (오류 아님)
+  - `4xx` (401 제외) → 경고 로그 후 스킵
+- **오류 진단**:
+  - 401 → `POCAT_INTERNAL_TOKEN` 환경변수 확인. 이 경우 RuntimeException 발생 → Job FAILED.
+  - 500 → 메인앱 로그 확인 (`/internal/cards/sync`)
+- **모니터링 포인트**:
+  - 실제 동기화 완료 여부는 메인앱 로그의 `syncExecutor` 스레드 추적
+  - 409 반복 시 메인앱에서 이전 동기화가 완료되지 않은 것 → 메인앱 syncExecutor 처리 시간 점검
+
+---
+
 ### aiReindexJob (ADR-018, #222)
 
 - **실행 주기**: 매일 01:00 (Asia/Seoul)
@@ -142,3 +196,11 @@ JVM 레벨에서 timezone을 명시하지 않으면 서버 OS 설정을 따른�
 - [ ] JVM 옵션 `-Duser.timezone=Asia/Seoul` 추가했는가?
 - [ ] Spring Batch 메타테이블(`BATCH_*`) 이 DB에 수동으로 생성되었는가? (`initialize-schema: never` 사용 시)
 - [ ] Actuator health 엔드포인트(`/actuator/health`)로 정상 기동 확인했는가?
+
+### #235 Internal API 위임 전환 추가 체크리스트
+
+- [ ] **메인앱 POCAT 먼저 배포 완료**했는가? (`auctionActivationJob`, `auctionExpirationJob`, `cardSyncJob`은 메인앱 internal API 의존)
+- [ ] `POCAT_INTERNAL_TOKEN` 환경변수가 메인앱 설정과 동일한 값으로 주입됐는가?
+- [ ] `POCAT_API_BASE_URL` 이 운영 메인앱 URL로 올바르게 설정됐는가?
+- [ ] 첫 배포 후 19:00 경매 활성화 배치 로그에서 `401` 오류 없음 확인했는가?
+- [ ] 일요일 00:00 cardSyncJob 최초 실행 후 메인앱 `syncExecutor` 로그에서 동기화 완료 확인했는가?
