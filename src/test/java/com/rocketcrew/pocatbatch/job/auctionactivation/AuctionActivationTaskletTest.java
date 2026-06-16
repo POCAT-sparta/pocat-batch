@@ -19,6 +19,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -72,7 +73,7 @@ class AuctionActivationTaskletTest {
     }
 
     @Test
-    void execute_여러_경매중_true_false_예외가_혼합된_경우_집계가_정확하다() throws Exception {
+    void execute_여러_경매중_예외가_발생하면_전체_처리_후_step이_실패한다() throws Exception {
         // given
         long jobExecutionId = 2L;
 
@@ -88,12 +89,14 @@ class AuctionActivationTaskletTest {
         when(mainAuctionLifecycleClient.activate(eq(3L), eq(jobExecutionId)))
                 .thenThrow(new RuntimeException("internal api error"));
 
-        // when
-        RepeatStatus status = auctionActivationTasklet.execute(
-                mock(StepContribution.class), newChunkContext(jobExecutionId));
+        ChunkContext chunkContext = newChunkContext(jobExecutionId);
+        StepContribution contribution = mock(StepContribution.class);
 
-        // then
-        assertThat(status).isEqualTo(RepeatStatus.FINISHED);
+        // when & then: 루프는 전부 실행(건별 스킵)하되 failedCount>0이면 step 실패
+        assertThatThrownBy(() -> auctionActivationTasklet.execute(contribution, chunkContext))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("1건 실패");
+
         verify(mainAuctionLifecycleClient, times(1)).activate(eq(1L), eq(jobExecutionId));
         verify(mainAuctionLifecycleClient, times(1)).activate(eq(2L), eq(jobExecutionId));
         verify(mainAuctionLifecycleClient, times(1)).activate(eq(3L), eq(jobExecutionId));

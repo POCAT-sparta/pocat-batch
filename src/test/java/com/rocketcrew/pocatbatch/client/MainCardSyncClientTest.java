@@ -108,7 +108,7 @@ class MainCardSyncClientTest {
     }
 
     @Test
-    void triggerSync_400_CARD_SYNC_IN_PROGRESS가_아닌_경우_정상_스킵된다() {
+    void triggerSync_400_오류시_RuntimeException을_던진다() {
         // given
         long jobExecutionId = 400L;
 
@@ -126,8 +126,8 @@ class MainCardSyncClientTest {
                         .contentType(MediaType.APPLICATION_JSON));
 
         // when & then
-        assertThatCode(() -> mainCardSyncClient.triggerSync(jobExecutionId))
-                .doesNotThrowAnyException();
+        assertThatThrownBy(() -> mainCardSyncClient.triggerSync(jobExecutionId))
+                .isInstanceOf(RuntimeException.class);
 
         mockServer.verify();
     }

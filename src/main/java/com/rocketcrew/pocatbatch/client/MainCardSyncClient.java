@@ -55,8 +55,9 @@ public class MainCardSyncClient {
                 return;
             }
 
-            log.warn("카드 동기화 트리거 4xx 오류로 스킵: jobExecutionId={}, status={}, body={}",
+            log.error("카드 동기화 트리거 4xx 오류: jobExecutionId={}, status={}, body={}",
                     jobExecutionId, e.getStatusCode(), responseBody);
+            throw new RuntimeException("카드 동기화 트리거 4xx 오류: status=" + e.getStatusCode(), e);
         }
     }
 }

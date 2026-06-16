@@ -57,6 +57,9 @@ public class AuctionExpirationTasklet implements Tasklet {
 
         log.info("경매 종료 완료: 대상={}, 종료={}, 스킵={}, 실패={}",
                 expiredAuctions.size(), closedCount, skippedCount, failedCount);
+        if (failedCount > 0) {
+            throw new RuntimeException("경매 종료 중 " + failedCount + "건 실패 — 로그 확인 필요");
+        }
         return RepeatStatus.FINISHED;
     }
 }

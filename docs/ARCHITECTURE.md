@@ -277,7 +277,7 @@ BatchScheduler(@Scheduled cron "0 0 0 * * SUN")
 
 ### 배포 순서 의존성
 
-```
+```text
 메인앱(POCAT) 배포 완료 → pocat-batch 배포
 ```
 

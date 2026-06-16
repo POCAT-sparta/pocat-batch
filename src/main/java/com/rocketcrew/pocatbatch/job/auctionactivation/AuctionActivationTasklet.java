@@ -53,6 +53,9 @@ public class AuctionActivationTasklet implements Tasklet {
 
         log.info("경매 활성화 완료: 대상={}, 활성화={}, 스킵={}, 실패={}",
                 approvedAuctions.size(), activatedCount, skippedCount, failedCount);
+        if (failedCount > 0) {
+            throw new RuntimeException("경매 활성화 중 " + failedCount + "건 실패 — 로그 확인 필요");
+        }
         return RepeatStatus.FINISHED;
     }
 }
