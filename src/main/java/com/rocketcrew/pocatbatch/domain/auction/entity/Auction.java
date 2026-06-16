@@ -61,21 +61,4 @@ public class Auction extends BaseEntity {
 
     @Column(name = "inspected_by")
     private Long inspectedBy;
-
-    /**
-     * 승인된 경매를 실제 진행 상태로 전환하고 시작/종료 시각을 확정한다.
-     */
-    public void activate(LocalDateTime startedAt, LocalDateTime endedAt) {
-        this.status = AuctionStatus.ACTIVE;
-        this.startedAt = startedAt;
-        this.endedAt = endedAt;
-        this.reason = null;
-    }
-
-    /**
-     * 진행 중인 경매를 정상 종료 상태로 전환한다.
-     */
-    public void end() {
-        this.status = AuctionStatus.ENDED;
-    }
 }

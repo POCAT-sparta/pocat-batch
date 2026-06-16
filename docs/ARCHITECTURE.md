@@ -7,6 +7,12 @@
 ```text
 com.rocketcrew.pocatbatch/
 ├── PocatBatchApplication
+├── client/
+│   ├── MainAiReindexClient         # POST /internal/ai/reindex-cards (ADR-018, #222)
+│   ├── MainAuctionLifecycleClient  # POST /internal/auctions/{id}/activate|close-expired (#235)
+│   ├── MainCardSyncClient          # POST /internal/cards/sync (#235)
+│   ├── MainAppBuyoutClient         # 즉시구매 처리 위임
+│   └── MainAppRefundClient         # 환불 처리 위임
 ├── config/
 │   ├── BatchConfig              # JobRepository, JobLauncher, TransactionManager 설정
 │   ├── JpaConfig                # DataSource, EntityManagerFactory 설정
@@ -20,6 +26,18 @@ com.rocketcrew.pocatbatch/
 │   └── service/
 │       └── FreePostFlushService # 조회수·댓글수 DB 반영 (@Transactional REQUIRES_NEW)
 ├── job/
+│   ├── auctionactivation/
+│   │   ├── AuctionActivationJobConfig  # auctionActivationJob 빈 등록 (#235)
+│   │   └── AuctionActivationTasklet    # APPROVED 경매 조회 → MainAuctionLifecycleClient.activate() (#235)
+│   ├── auctionexpiration/
+│   │   ├── AuctionExpirationJobConfig  # auctionExpirationJob 빈 등록 (#235)
+│   │   └── AuctionExpirationTasklet    # 만료 ACTIVE 경매 조회 → MainAuctionLifecycleClient.closeExpired() (#235)
+│   ├── cardsync/
+│   │   ├── CardSyncJobConfig    # cardSyncJob 빈 등록 (#235)
+│   │   └── CardSyncTasklet      # MainCardSyncClient.triggerSync() 1회 호출 (#235)
+│   ├── aireindex/
+│   │   ├── AiReindexJobConfig   # aiReindexJob, aiReindexStep 빈 등록 (ADR-018, #222)
+│   │   └── AiReindexTasklet     # cursor 기반 카드ID 청크 조회 + MainAiReindexClient 호출
 │   ├── ranking/
 │   │   ├── FreePostRankingJobConfig   # freePostRankingJob, freePostRankingStep 빈 등록
 │   │   └── FreePostRankingTasklet     # 랭킹 조회 → Redis ZSet RENAME
@@ -27,7 +45,7 @@ com.rocketcrew.pocatbatch/
 │       ├── ViewCountFlushJobConfig    # viewCountFlushJob, viewCountFlushStep 빈 등록
 │       └── ViewCountFlushTasklet      # Redis 버퍼 → MySQL 플러시
 └── scheduler/
-    └── BatchScheduler           # @Scheduled(fixedDelay=60s) — JobLauncher 실행 트리거
+    └── BatchScheduler           # @Scheduled(cron/fixedDelay) — JobLauncher 실행 트리거
 ```
 
 ---
@@ -189,6 +207,81 @@ BatchScheduler(@Scheduled cron, 저빈도)
 DB 컬럼을 추가하지 않고 ES 문서 존재 여부(`metadata.cardId.keyword`)로만 판정한다. 실패한 카드는 ES 미반영 상태로 남아 다음 배치 회차에 자동 재시도된다(self-healing).
 
 > 상세 설계 결정 및 대안 검토는 [ADR-018: AI 카드 임베딩 재색인 스케줄 배치 이전](../../POCAT/docs/adr/ADR-018-ai-card-reindex-batch-migration-%23222.md) 참고.
+
+---
+
+## auctionActivationJob / auctionExpirationJob / cardSyncJob (Internal API 위임, #235)
+
+> 경매 라이프사이클 처리와 카드 동기화를 배치 서버 내 자체 도메인 로직 없이 메인앱 Internal API로 위임하는 패턴 (#235). `aiReindexJob`(ADR-018)과 동일한 전략 C(internal API 위임) 적용.
+
+### 주요 변경 (#235)
+
+- 삭제: 기존 배치 서버 내 `AuctionBatchService`, `OutboxEventWriter` 등 경매/카드 자체 처리 로직
+- 신규: `MainAuctionLifecycleClient` — 경매 활성화·만료 종료 위임 클라이언트
+- 신규: `MainCardSyncClient` — 카드 동기화 트리거 위임 클라이언트
+
+### Internal API 위임 대상
+
+| Job | Tasklet | 위임 엔드포인트 | 비고 |
+|-----|---------|----------------|------|
+| `auctionActivationJob` | `AuctionActivationTasklet` | `POST /internal/auctions/{id}/activate` | APPROVED 경매 건별 호출, 3회 재시도(지수 백오프), `Idempotency-Key` 포함 |
+| `auctionExpirationJob` | `AuctionExpirationTasklet` | `POST /internal/auctions/{id}/close-expired` | 만료 ACTIVE 경매 건별 호출, 3회 재시도(지수 백오프), `Idempotency-Key` 포함 |
+| `cardSyncJob` | `CardSyncTasklet` | `POST /internal/cards/sync` | 주 1회(일요일 자정) 단일 트리거. 실제 동기화는 메인앱 `syncExecutor` 비동기 실행 |
+
+### 처리 흐름 (경매 라이프사이클)
+
+```text
+BatchScheduler(@Scheduled cron)
+  ├─ runAuctionActivation() [매일 19:00]
+  │    └─ JobLauncher.run(auctionActivationJob)
+  │         └─ auctionActivationStep
+  │              └─ AuctionActivationTasklet
+  │                   ├─ AuctionRepository.findAllByStatus(APPROVED) → APPROVED 경매 목록
+  │                   └─ (건별) MainAuctionLifecycleClient.activate(auctionId, jobExecutionId)
+  │                        └─ POST /internal/auctions/{id}/activate
+  │                             (X-Internal-Token, Idempotency-Key=auction-activate-{id}-{jobExecutionId})
+  │                             → ApiResponseEnvelope<Boolean> (data: true=활성화, false=스킵)
+  │
+  └─ runAuctionExpiration() [매일 19:05~19:30 매분]
+       └─ JobLauncher.run(auctionExpirationJob)
+            └─ auctionExpirationStep
+                 └─ AuctionExpirationTasklet
+                      ├─ AuctionRepository.findAllByStatusAndEndedAtLessThanEqual(ACTIVE, now) → 만료 경매 목록
+                      └─ (건별) MainAuctionLifecycleClient.closeExpired(auctionId, jobExecutionId)
+                           └─ POST /internal/auctions/{id}/close-expired
+                                (X-Internal-Token, Idempotency-Key=auction-close-{id}-{jobExecutionId})
+```
+
+### 처리 흐름 (카드 동기화)
+
+```text
+BatchScheduler(@Scheduled cron "0 0 0 * * SUN")
+  └─ runCardSync()
+       └─ JobLauncher.run(cardSyncJob)
+            └─ cardSyncStep
+                 └─ CardSyncTasklet
+                      └─ MainCardSyncClient.triggerSync(jobExecutionId)
+                           └─ POST /internal/cards/sync
+                                (X-Internal-Token)
+                                → 202: 정상 트리거 완료
+                                  409(CARD_SYNC_IN_PROGRESS): 정상 스킵
+                                  401: RuntimeException (Job FAILED)
+                                  기타 4xx: 경고 로그 후 스킵
+                           ↓ (비동기)
+                           메인앱 syncExecutor 카드 동기화 실행
+```
+
+### 인증
+
+모든 internal API 호출에 `X-Internal-Token` 헤더를 포함한다. 토큰 값은 `${pocat.main-app.internal-token}` 환경변수(`.env`의 `POCAT_INTERNAL_TOKEN`)에서 주입된다.
+
+### 배포 순서 의존성
+
+```text
+메인앱(POCAT) 배포 완료 → pocat-batch 배포
+```
+
+메인앱 먼저 배포하지 않으면 `auctionActivationJob`, `auctionExpirationJob`, `cardSyncJob` 실행 시 연결 오류 또는 404 발생.
 
 ---
 
