@@ -156,6 +156,23 @@ SHOW TABLES LIKE 'BATCH_%';
 - `@Scheduled` 어노테이션 제거 또는
 - 해당 스케줄러 클래스에 `@Profile("!prod")` 추가로 운영 프로파일에서 제외
 
+### 조회수 플러시 (viewCountFlushJob, 1분 주기)
+
+`ViewCountFlushTasklet`이 다음 3개 버퍼를 처리한다 — 자유글 조회수 `{view:free}:buffer`,
+자유글 댓글수 `{comment:free}:buffer`, 거래글 조회수 `{view:trade}:buffer`.
+각 버퍼를 `processing` 키로 `RENAME`한 뒤 ZSet 전량을 `Map<id, delta>`로 모아
+**JDBC batch 1회**(`ViewCountBulkRepository`)로 DB에 반영한다. 실패분은 `*:processing:failed`
+ZSet(24h TTL)에 모아 다음 주기에 재병합한다.
+
+- **Redis 키 표준화**: 메인 앱·배치 모두 Redis Cluster이므로 `buffer`/`processing`이 같은 슬롯에
+  있도록 버퍼 키를 해시태그 `{...}`로 감싼다. 메인 앱 writer(`FreePostViewCountService`,
+  `FreePostCommentCountService`, `tradepost.ViewCountService`)와 키가 일치해야 한다.
+- **구 키 1회성 drain**: 키 표준화 이전 un-tagged 키(`view:free:buffer`, `comment:free:buffer`,
+  `view:buffer`)에 남은 backlog는 tasklet이 1회 drain(read+merge+delete)한다. 배포 후 로그에서
+  `legacy 버퍼 drain 완료`를 1회 확인하면 완료 — 이후 자연 no-op이며, 후속 PR에서 drain 코드 제거 예정.
+- **성능 전제**: batch 효과(라운드트립 절감)는 MySQL JDBC URL의 `rewriteBatchedStatements=true`에서
+  나온다. 운영 `DB_URL`(Parameter Store)에 이 옵션이 포함됐는지 확인할 것. (옵션 없이도 기능은 동일)
+
 ### BATCH_* 테이블 스키마 분리
 
 운영 환경에서는 `BATCH_*` 메타테이블을 별도 스키마(예: `batch`)에 분리 운영하는 것을 권장한다.
@@ -199,7 +216,9 @@ JVM 레벨에서 timezone을 명시하지 않으면 서버 OS 설정을 따른�
 
 ### #235 Internal API 위임 전환 추가 체크리스트
 
-- [ ] **메인앱 POCAT 먼저 배포 완료**했는가? (`auctionActivationJob`, `auctionExpirationJob`, `cardSyncJob`은 메인앱 internal API 의존)
+- [ ] **메인앱 POCAT 먼저 배포 완료**했는가? (`auctionActivationJob`, `auctionExpirationJob`, `cardSyncJob`은 메인앱 internal API 의존; **조회수 키 해시태그 표준화도 메인앱 먼저 배포**해야 구 키 drain이 레이스 없이 동작)
+- [ ] 운영 `DB_URL`에 `rewriteBatchedStatements=true` 가 포함됐는가? (조회수 bulk 반영 성능 전제)
+- [ ] 배포 후 로그에서 `legacy 버퍼 drain 완료` 1회 확인 → 후속 PR로 drain 코드 제거 예약했는가?
 - [ ] `POCAT_INTERNAL_TOKEN` 환경변수가 메인앱 설정과 동일한 값으로 주입됐는가?
 - [ ] `POCAT_API_BASE_URL` 이 운영 메인앱 URL로 올바르게 설정됐는가?
 - [ ] 첫 배포 후 19:00 경매 활성화 배치 로그에서 `401` 오류 없음 확인했는가?

@@ -19,12 +19,16 @@ com.rocketcrew.pocatbatch/
 │   └── RedisConfig              # RedisTemplate, StringRedisTemplate 설정
 ├── domain/freepost/
 │   ├── entity/
-│   │   ├── BaseEntity           # createdAt, updatedAt (MappedSuperclass)
+│   │   ├── BaseEntity           # createdAt, updatedAt, deletedAt (MappedSuperclass)
 │   │   └── FreePost             # 자유게시판 게시글 엔티티 (메인 앱에서 복제)
-│   ├── repository/
-│   │   └── FreePostRepository   # JPA 레포지토리 (인기 점수 정렬 조회 포함)
-│   └── service/
-│       └── FreePostFlushService # 조회수·댓글수 DB 반영 (@Transactional REQUIRES_NEW)
+│   └── repository/
+│       └── FreePostRepository   # JPA 레포지토리 (인기 점수 정렬 조회)
+├── domain/tradepost/
+│   └── entity/
+│       └── TradePost            # 거래글 엔티티 (view_count만 매핑 — 스키마/validate 파리티)
+├── domain/viewcount/
+│   └── repository/
+│       └── ViewCountBulkRepository # 조회수·댓글수 JDBC batch 반영 (@Transactional REQUIRES_NEW)
 ├── job/
 │   ├── auctionactivation/
 │   │   ├── AuctionActivationJobConfig  # auctionActivationJob 빈 등록 (#235)
@@ -67,9 +71,9 @@ flowchart TD
 
     S2 --> JL2["JobLauncher.run(viewCountFlushJob)"]
     JL2 --> STEP2["viewCountFlushStep"]
-    STEP2 --> T2["ViewCountFlushTasklet"]
-    T2 --> FS1["FreePostFlushService.increaseViewCount\n(@Transactional REQUIRES_NEW)"]
-    T2 --> FS2["FreePostFlushService.updateCommentCount\n(@Transactional REQUIRES_NEW)"]
+    STEP2 --> T2["ViewCountFlushTasklet\n(자유글 조회수/댓글수 + 거래글 조회수)"]
+    T2 --> FS1["ViewCountBulkRepository.increaseFreePostViewCount / CommentCount\n(JDBC batch, @Transactional REQUIRES_NEW)"]
+    T2 --> FS2["ViewCountBulkRepository.increaseTradePostViewCount\n(JDBC batch, @Transactional REQUIRES_NEW)"]
     FS1 --> DB[(MySQL)]
     FS2 --> DB
 ```
@@ -88,9 +92,10 @@ BatchScheduler(@Scheduled fixedDelay=60s)
   └─ runViewCountFlushJob()
        └─ JobLauncher.run(viewCountFlushJob)
             └─ viewCountFlushStep
-                 └─ ViewCountFlushTasklet
-                      ├─ FreePostFlushService.increaseViewCount (@Transactional REQUIRES_NEW)
-                      └─ FreePostFlushService.updateCommentCount (@Transactional REQUIRES_NEW)
+                 └─ ViewCountFlushTasklet  (버퍼별 RENAME → ZSet 전량을 Map<id,delta>로 수집 → bulk 1회)
+                      ├─ ViewCountBulkRepository.increaseFreePostViewCount (JDBC batch, REQUIRES_NEW)
+                      ├─ ViewCountBulkRepository.increaseFreePostCommentCount (JDBC batch, REQUIRES_NEW)
+                      └─ ViewCountBulkRepository.increaseTradePostViewCount (JDBC batch, REQUIRES_NEW)
 ```
 
 ---
@@ -101,12 +106,18 @@ BatchScheduler(@Scheduled fixedDelay=60s)
 |----|------|-----|
 | `ranking:free:popular` | 자유게시판 인기 랭킹 ZSet (서빙용) | 70s |
 | `ranking:free:popular:new` | 랭킹 갱신 임시 키 (RENAME 전) | - |
-| `view:free:buffer` | FreePost 조회수 버퍼 (게시글 ID → 조회수 증가량) | - |
-| `view:free:buffer:processing` | 조회수 플러시 처리 중 키 (RENAME 후) | - |
-| `view:free:buffer:processing:failed` | 조회수 플러시 실패 재처리 큐 | 24h |
-| `comment:free:buffer` | FreePost 댓글수 버퍼 (게시글 ID → 댓글수 증가량) | - |
-| `comment:free:buffer:processing` | 댓글수 플러시 처리 중 키 (RENAME 후) | - |
-| `comment:free:buffer:processing:failed` | 댓글수 플러시 실패 재처리 큐 | 24h |
+| `{view:free}:buffer` | FreePost 조회수 버퍼 (게시글 ID → 조회수 증가량) | - |
+| `{view:free}:buffer:processing` | 조회수 플러시 처리 중 키 (RENAME 후) | - |
+| `{view:free}:buffer:processing:failed` | 조회수 플러시 실패 재처리 큐 | 24h |
+| `{comment:free}:buffer` | FreePost 댓글수 버퍼 (게시글 ID → 댓글수 증가량) | - |
+| `{comment:free}:buffer:processing` | 댓글수 플러시 처리 중 키 (RENAME 후) | - |
+| `{comment:free}:buffer:processing:failed` | 댓글수 플러시 실패 재처리 큐 | 24h |
+| `{view:trade}:buffer` | TradePost 조회수 버퍼 (게시글 ID → 조회수 증가량) | - |
+| `{view:trade}:buffer:processing` | 거래글 조회수 플러시 처리 중 키 (RENAME 후) | - |
+| `{view:trade}:buffer:processing:failed` | 거래글 조회수 플러시 실패 재처리 큐 | 24h |
+
+> **해시태그 `{...}`**: 메인 앱(writer)과 배치(reader)가 모두 Redis Cluster를 사용하므로, `buffer`와 `processing` 키가 같은 해시 슬롯에 있어야 `RENAME`이 가능하다. 따라서 버퍼 키는 해시태그로 감싼다.
+> 키 표준화 이전의 un-tagged 키(`view:free:buffer`, `comment:free:buffer`, `view:buffer`)는 배치가 1회성으로 drain(read+merge+delete)한 뒤 자연 소멸한다.
 
 ---
 
@@ -115,11 +126,10 @@ BatchScheduler(@Scheduled fixedDelay=60s)
 | 레이어 | 클래스 | 전파 수준 | 이유 |
 |--------|--------|-----------|------|
 | Tasklet | `FreePostRankingTasklet` | Spring Batch 기본 (Step 트랜잭션) | 랭킹 조회는 읽기 전용; Redis RENAME은 원자적 |
-| Tasklet | `ViewCountFlushTasklet` | 트랜잭션 없음 (서비스 위임) | 레코드별 독립 처리 위해 서비스 계층에 위임 |
-| Service | `FreePostFlushService.increaseViewCount` | `REQUIRES_NEW` | 게시글별 독립 커밋; 하나 실패가 전체 롤백 전파 방지 |
-| Service | `FreePostFlushService.updateCommentCount` | `REQUIRES_NEW` | 동상 (게시글별 독립 커밋) |
+| Tasklet | `ViewCountFlushTasklet` | 트랜잭션 없음 (레포지토리 위임) | 버퍼 종류별 독립 처리 위해 레포지토리 계층에 위임 |
+| Repository | `ViewCountBulkRepository.increase*` | `REQUIRES_NEW` | 버퍼 종류별 독립 커밋; 한 버퍼 실패가 다른 버퍼 롤백 전파 방지 |
 
-> `REQUIRES_NEW` 사용 이유: Redis 버퍼에서 읽은 게시글 ID 목록을 순회하며 건별로 DB 업데이트할 때, 특정 게시글 업데이트 실패가 전체 배치 롤백으로 이어지지 않도록 격리. 실패 항목은 `*:failed` 키에 재적재하여 다음 주기에 재처리.
+> `REQUIRES_NEW` 사용 이유: 버퍼 종류(자유글 조회수/댓글수, 거래글 조회수)별로 ZSet 전량을 `Map<id, delta>`로 모아 **JDBC batch 1회**로 반영한다. `REQUIRES_NEW`로 버퍼 단위 트랜잭션을 분리해, 한 버퍼의 실패가 다른 버퍼를 롤백시키지 않도록 격리한다. batch가 예외로 롤백되면(부분 반영 없음) 해당 버퍼 항목 전량을 `*:failed` 키에 재적재하여 다음 주기에 재처리한다.
 
 ---
 

@@ -972,10 +972,10 @@ DB_PASSWORD=mypassword
 읽는 순서:
 1. domain/freepost/entity/BaseEntity.java          → 공통 엔티티 필드
 2. domain/freepost/entity/FreePost.java             → 엔티티 복제 방식, @SQLRestriction
-3. domain/freepost/repository/FreePostRepository.java → @Modifying int 반환, 복잡한 조회 쿼리
-4. domain/freepost/service/FreePostFlushService.java  → REQUIRES_NEW, 0행 처리
+3. domain/freepost/repository/FreePostRepository.java → 복잡한 조회 쿼리 (인기 점수 정렬)
+4. domain/viewcount/repository/ViewCountBulkRepository.java → JDBC batch 반영, REQUIRES_NEW
 5. job/ranking/FreePostRankingTasklet.java           → 패턴 A (Redis 캐시 갱신)
-6. job/viewcount/ViewCountFlushTasklet.java          → 패턴 B (Redis 버퍼 → MySQL 플러시)
+6. job/viewcount/ViewCountFlushTasklet.java          → 패턴 B (Redis 버퍼 → MySQL bulk 플러시)
 7. job/ranking/FreePostRankingJobConfig.java         → JobConfig 구조
 8. scheduler/BatchScheduler.java                    → 수동 생성자 + @Qualifier + @Scheduled
 ```
