@@ -57,6 +57,8 @@ class MainAiReindexClientTest {
 
         mockServer.expect(requestTo(BASE_URL + "/internal/ai/reindex-cards"))
                 .andExpect(method(org.springframework.http.HttpMethod.POST))
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(content().json("{\"cardIds\":[1,2,3]}"))
                 .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
 
         // when

@@ -1,6 +1,7 @@
 package com.rocketcrew.pocatbatch.client;
 
 import com.rocketcrew.pocatbatch.client.dto.ApiResponseEnvelope;
+import com.rocketcrew.pocatbatch.client.dto.ReindexChunkRequest;
 import com.rocketcrew.pocatbatch.client.dto.ReindexChunkResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,7 +47,7 @@ public class MainAiReindexClient {
         headers.set("Idempotency-Key", String.format("reindex-cards-%d-%d-%d", firstCardId, lastCardId, jobExecutionId));
         headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
 
-        HttpEntity<List<Long>> request = new HttpEntity<>(cardIds, headers);
+        HttpEntity<ReindexChunkRequest> request = new HttpEntity<>(new ReindexChunkRequest(cardIds), headers);
 
         int maxRetries = 3;
         long delayMs = 1000;
